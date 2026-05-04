@@ -4,11 +4,10 @@ import numpy as np
 from ultralytics import YOLO
 import gdown
 import os
-import streamlit as st
-# 1. INITIALIZE ALL MODELS (Cached for Streamlit performance)
+
+# --- 1. INITIALIZE ASSETS ---
 @st.cache_resource
 def load_all_assets():
-    # 1. Define the files and IDs
     files = {
         "yolo26n.pt": "1ZGTbc_oHmu42n1EE-cEa0TVBtL7zZ-g2",
         "yolo26s.pt": "1FjrI1avV-uC77iFtk41anBJStyXDLp8p",
@@ -18,21 +17,11 @@ def load_all_assets():
         "yolov8x-oiv7.pt": "1pZNZfN-iRcV6040OIGmQSSrAMT_5KoM6"
     }
 
-    # 2. Download missing files
     for filename, drive_id in files.items():
         if not os.path.exists(filename):
-            # Note: st.spinner won't work inside cache_resource easily, 
-            # so we use a simple print or st.info
             url = f'https://drive.google.com/uc?id={drive_id}'
             gdown.download(url, filename, quiet=False)
 
-    for filename in files.keys():
-        if os.path.exists(filename):
-            st.write(f"✅ {filename} is present ({os.path.getsize(filename) / 1e6:.2f} MB)")
-        else:
-            st.error(f"❌ {filename} is MISSING!")
-        
-    # 3. Load the models into memory
     models = {
         "yolo26n": YOLO('yolo26n.pt'),
         "yolo26s": YOLO('yolo26s.pt'),
@@ -41,21 +30,12 @@ def load_all_assets():
         "lvis_v8": YOLO('yolov8x-worldv2.pt'),
         "car_expert": YOLO('yolov8x-oiv7.pt')
     }
-       
     return models
-    
-# Initialize everything
+
 models = load_all_assets()
-# Separate the signal model if needed, or just reference from the dict
 model_signal = models["yolo26x"]
 
-# --- COORDINATE STORAGE ---
-if 'coords' not in st.session_state:
-    st.session_state.coords = {
-        "blue_cars": [], "other_cars": [], 
-        "signals": [], "people": []
-    }
-
+# --- 2. HELPER FUNCTIONS ---
 def calculate_iou(box1, box2):
     x1_1, y1_1, x2_1, y2_1 = box1
     x1_2, y1_2, x2_2, y2_2 = box2
@@ -68,7 +48,6 @@ def calculate_iou(box1, box2):
     return inter_area / union_area if union_area > 0 else 0
 
 def is_duplicate(new_box, saved_boxes, iou_thresh=0.4):
-    if not saved_boxes: return False
     for saved in saved_boxes:
         if calculate_iou(new_box, saved) > iou_thresh: return True
     return False
@@ -76,6 +55,7 @@ def is_duplicate(new_box, saved_boxes, iou_thresh=0.4):
 def is_blue_car_robust(car_crop_rgb):
     if car_crop_rgb.size == 0: return 0
     R, G, B = car_crop_rgb[:,:,0].astype(float), car_crop_rgb[:,:,1].astype(float), car_crop_rgb[:,:,2].astype(float)
+    # Flag: If Blue is dominant and significantly brighter than other channels
     blue_mask = (B > R) & (B > G) & (B > 50) & (B > (R + G) * 0.65)
     return np.count_nonzero(blue_mask) / (car_crop_rgb.shape[0] * car_crop_rgb.shape[1])
 
@@ -86,41 +66,42 @@ def get_color_modes(img):
         "Grey": cv2.cvtColor(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY), cv2.COLOR_GRAY2BGR)
     }
 
-def process_image(uploaded_file):
+# --- 3. CORE PROCESSING ---
+def process_image(uploaded_file, debug_mode=False):
     uploaded_file.seek(0)
     file_bytes = np.frombuffer(uploaded_file.read(), np.uint8)
     img_bgr = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
     
-    if img_bgr is None:
-        return None, 0, 0, "Error", 0
+    if img_bgr is None: return None, 0, 0, "Error", 0
 
     h, w, _ = img_bgr.shape
     img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
     display_img = img_bgr.copy()
     
-    # Use local lists for current processing
-    tmp_signals = []
-    tmp_cars_blue = []
-    tmp_cars_other = []
-    tmp_people = []
+    debug_logs = []
+    tmp_signals, tmp_cars_blue, tmp_cars_other, tmp_people = [], [], [], []
+
+    # --- FLAG 1: VERIFY CLASS INDICES ---
+    if debug_mode:
+        debug_logs.append(f"Model Classes Found: {list(models['car_expert'].names.values())[:10]}...")
 
     # --- STEP 1: CAR DETECTION ---
     mid_h, mid_w, margin = h // 2, w // 2, 10
-    # OIV7 Car classes - verify these with your specific model metadata[cite: 1]
-    car_classes = [90, 223, 312, 522] 
+    car_classes = [90, 223, 312, 522] # OIV7 indices for vehicle types
     
-    # Quadrant Pass
-    q_internal_sum = 0
+    # Quadrant Analysis
     quads = [img_rgb[0:mid_h, 0:mid_w], img_rgb[0:mid_h, mid_w:w],
              img_rgb[mid_h:h, 0:mid_w], img_rgb[mid_h:h, mid_w:w]]
     
-    for q_img in quads:
+    q_internal_sum = 0
+    for idx, q_img in enumerate(quads):
         res = models["car_expert"].predict(q_img, imgsz=640, conf=0.25, classes=car_classes, verbose=False)[0]
+        if debug_mode: debug_logs.append(f"Quadrant {idx+1} found {len(res.boxes)} potential cars.")
         for box in res.boxes.xyxy.cpu().numpy():
             if not (box[0] <= margin or box[2] >= (w//2)-margin or box[1] <= margin or box[3] >= (h//2)-margin):
                 q_internal_sum += 1
 
-    # Global Pass
+    # Global Detection
     whole_res = models["car_expert"].predict(img_rgb, imgsz=640, conf=0.25, classes=car_classes, verbose=False)[0]
     saved_cars = []
     for box in whole_res.boxes.xyxy.cpu().numpy():
@@ -129,13 +110,15 @@ def process_image(uploaded_file):
 
     final_car_count = max(len(saved_cars), q_internal_sum + sum(1 for b in saved_cars if (b[0] < mid_w < b[2]) or (b[1] < mid_h < b[3])))
 
+    # Color Filtering
     blue_count = 0
     for box in saved_cars:
         x1, y1, x2, y2 = map(int, box)
-        if is_blue_car_robust(img_rgb[y1:y2, x1:x2]) > 0.30:
+        blue_ratio = is_blue_car_robust(img_rgb[y1:y2, x1:x2])
+        if blue_ratio > 0.30:
             blue_count += 1
             tmp_cars_blue.append(box.tolist())
-            cv2.rectangle(display_img, (x1, y1), (x2, y2), (0, 0, 255), 3)
+            cv2.rectangle(display_img, (x1, y1), (x2, y2), (0, 0, 255), 3) # Blue cars tagged Red for visibility
         else:
             tmp_cars_other.append(box.tolist())
             cv2.rectangle(display_img, (x1, y1), (x2, y2), (255, 0, 0), 3)
@@ -148,10 +131,10 @@ def process_image(uploaded_file):
             if not is_duplicate(box, tmp_signals):
                 tmp_signals.append(box.tolist())
 
-    # Fallback Strips[cite: 1]
+    # --- FLAG 2: SIGNAL FALLBACK TRIGGERED? ---
     if not tmp_signals:
-        h_steps = np.linspace(0, h, 11).astype(int)
-        w_steps = np.linspace(0, w, 11).astype(int)
+        if debug_mode: debug_logs.append("Primary Signal Detection failed. Running strip-scan fallback.")
+        h_steps, w_steps = np.linspace(0, h, 11).astype(int), np.linspace(0, w, 11).astype(int)
         
         for i in range(10): # Horizontal
             y1, y2 = h_steps[i], h_steps[i+1]
@@ -162,7 +145,7 @@ def process_image(uploaded_file):
                     g_box = [box[0]*(w/640), box[1]*((y2-y1)/640)+y1, box[2]*(w/640), box[3]*((y2-y1)/640)+y1]
                     if not is_duplicate(g_box, tmp_signals): tmp_signals.append(g_box)
         
-        for j in range(10): # Vertical - Corrected Scaling[cite: 1]
+        for j in range(10): # Vertical
             x1, x2 = w_steps[j], w_steps[j+1]
             strip_w = x2 - x1
             for mode in modes:
@@ -195,23 +178,41 @@ def process_image(uploaded_file):
     for b in tmp_signals:
         cv2.rectangle(display_img, (int(b[0]), int(b[1])), (int(b[2]), int(b[3])), (255, 0, 255), 3)
 
-    # Sync back to session state for persistence if needed
-    st.session_state.coords = {"blue_cars": tmp_cars_blue, "other_cars": tmp_cars_other, "signals": tmp_signals, "people": tmp_people}
-    
-    return display_img, final_car_count, blue_count, scene, p_count   
+    return display_img, final_car_count, blue_count, scene, p_count, debug_logs
 
-# --- STREAMLIT GUI ---
+# --- 4. STREAMLIT GUI ---
+st.set_page_config(page_title="Traffic Intelligence", layout="wide")
 st.title("Traffic Scene Intelligence")
+
+# Debug Flag Sidebar
+with st.sidebar:
+    st.header("Debug Controls")
+    debug_active = st.checkbox("Enable Debug Mode", value=False)
+    st.write("---")
+    st.write("**Model Status:**")
+    for m_name in models.keys():
+        st.write(f"✅ {m_name} loaded")
+
 uploaded_file = st.file_uploader("Upload image for analysis", type=['jpg', 'jpeg', 'png'])
 
 if uploaded_file:
-    res_img, t_cars, b_cars, scene, p_counts = process_image(uploaded_file)
-    st.image(cv2.cvtColor(res_img, cv2.COLOR_BGR2RGB), use_column_width=True)
+    # Process
+    res_img, t_cars, b_cars, scene, p_counts, logs = process_image(uploaded_file, debug_active)
     
-    st.markdown(f"""
-    **Total Cars:** {t_cars}  
-    **Blue Cars Count:** {b_cars}  
-    **Other Cars Count:** {t_cars - b_cars}  
-    **Scene Type:** {scene}  
-    **People Counts:** {p_counts}
-    """)
+    # Display Result
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.image(cv2.cvtColor(res_img, cv2.COLOR_BGR2RGB), use_container_width=True, caption="Processed Scene")
+    
+    with col2:
+        st.subheader("Inference Results")
+        st.metric("Total Cars", t_cars)
+        st.metric("Blue Cars", b_cars)
+        st.metric("People Count", p_counts)
+        st.info(f"Detected Scene: **{scene}**")
+        
+        if debug_active:
+            st.warning("Debug Logs:")
+            for log in logs:
+                st.write(f"- {log}")
