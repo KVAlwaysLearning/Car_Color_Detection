@@ -87,17 +87,17 @@ def get_color_modes(img):
     }
 
 def process_image(uploaded_file):
-    # Reset the pointer to the start of the file just in case
+    # CRITICAL: Reset the file pointer to the beginning
     uploaded_file.seek(0)
     
-    # Convert Streamlit buffer to OpenCV
-    file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
-    img_bgr = cv2.imdecode(file_bytes, 1)
-
-    if img_bgr is None:
-        st.error("Could not decode image. Please try a different file.")
-        return None, 0, 0, "Error", 0
+    # Read bytes and convert to a format OpenCV understands
+    file_bytes = np.frombuffer(uploaded_file.read(), np.uint8)
+    img_bgr = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
     
+    if img_bgr is None:
+        st.error("Failed to decode image. Check file format.")
+        return None, 0, 0, "Error", 0
+
     h, w, _ = img_bgr.shape
     img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
     display_img = img_bgr.copy()
