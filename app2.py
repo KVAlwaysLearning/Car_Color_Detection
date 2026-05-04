@@ -146,4 +146,3 @@ if uploaded_file:
         st.metric("Pedestrians", p_counts)
         st.info(f"Scene: {scene}")
         for log in logs: st.write(f"• {log}")
-```
