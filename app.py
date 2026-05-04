@@ -162,12 +162,18 @@ def process_image(uploaded_file):
     if st.session_state.coords["signals"]:
         scene = "Traffic Signal Scene"
         all_p, all_c = [], []
-        for name, m in models.items():
-            if name == "car_expert": continue
+
+        # Define which models look for people
+        people_models = ["yolo26n", "yolo26s", "yolo26x", "idd_v8", "lvis_v8"]
+       
+        for name in people_models:
+            m = models[name]
             for img_data in modes:
-                res = m.predict(img_data, imgsz=1280, conf=0.30, verbose=False)[0]
+                # We filter for class 0 (person) directly in the prediction call
+                res = m.predict(img_data, imgsz=1280, conf=0.30, classes=[0], verbose=False)[0]
+                
                 for box in res.boxes:
-                    if int(box.cls[0]) == 0:
+                  
                         all_p.append(box.xyxy[0].cpu().numpy().tolist())
                         all_c.append(float(box.conf[0]))
         
