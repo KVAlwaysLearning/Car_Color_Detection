@@ -117,10 +117,12 @@ def process_image(uploaded_file, debug_mode=False):
             p_count += 1
             cv2.rectangle(display_img, (int(box[0]), int(box[1])), (int(box[2]), int(box[3])), (0, 255, 0), 2)
 
-    if debug_mode:
+    if debug_mode:if debug_mode:
         debug_logs.append(f"Image Resolution: {w}x{h}")
-        debug_logs.append(f"Raw Car Detections: {len(whole_res.boxes)}")
-        debug_logs.append(f"Signals Found: {len(tmp_signals)}")
+        # New Log: Show every class ID detected, even if it's not a car
+        detected_ids = whole_res.boxes.cls.cpu().numpy().tolist()
+        debug_logs.append(f"Detected Class IDs: {list(set(detected_ids))}") 
+        debug_logs.append(f"Raw Detections: {len(whole_res.boxes)}")
 
     return display_img, len(saved_cars), blue_count, scene, p_count, debug_logs
 
