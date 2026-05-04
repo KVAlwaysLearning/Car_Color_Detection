@@ -30,7 +30,7 @@ def load_all_assets():
         "car_expert": YOLO('yolov8x-oiv7.pt')
     }
     # Explicitly set vocabulary for LVIS to ensure indexing matches our map
-    mods["lvis_v8"].set_classes(["person", "pedestrian", "rider", "car", "traffic_light"])
+    #mods["lvis_v8"].set_classes(["person", "pedestrian", "rider", "car", "traffic_light"])
     return mods
 
 models = load_all_assets()
