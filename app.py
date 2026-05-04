@@ -87,42 +87,44 @@ def get_color_modes(img):
     }
 
 def process_image(uploaded_file):
-    # CRITICAL: Reset the file pointer to the beginning
     uploaded_file.seek(0)
-    
-    # Read bytes and convert to a format OpenCV understands
     file_bytes = np.frombuffer(uploaded_file.read(), np.uint8)
     img_bgr = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
     
     if img_bgr is None:
-        st.error("Failed to decode image. Check file format.")
         return None, 0, 0, "Error", 0
 
     h, w, _ = img_bgr.shape
     img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
     display_img = img_bgr.copy()
     
-    # Reset coordinates
-    st.session_state.coords = {"blue_cars":[], "other_cars":[], "signals":[], "people":[]}
+    # Use local lists for current processing
+    tmp_signals = []
+    tmp_cars_blue = []
+    tmp_cars_other = []
+    tmp_people = []
 
     # --- STEP 1: CAR DETECTION ---
     mid_h, mid_w, margin = h // 2, w // 2, 10
-    car_classes = [90, 223, 312, 522]
+    # OIV7 Car classes - verify these with your specific model metadata[cite: 1]
+    car_classes = [90, 223, 312, 522] 
     
-    quads = {"Q1": img_rgb[0:mid_h, 0:mid_w], "Q2": img_rgb[0:mid_h, mid_w:w],
-             "Q3": img_rgb[mid_h:h, 0:mid_w], "Q4": img_rgb[mid_h:h, mid_w:w]}
-    
+    # Quadrant Pass
     q_internal_sum = 0
-    for q_img in quads.values():
+    quads = [img_rgb[0:mid_h, 0:mid_w], img_rgb[0:mid_h, mid_w:w],
+             img_rgb[mid_h:h, 0:mid_w], img_rgb[mid_h:h, mid_w:w]]
+    
+    for q_img in quads:
         res = models["car_expert"].predict(q_img, imgsz=640, conf=0.25, classes=car_classes, verbose=False)[0]
         for box in res.boxes.xyxy.cpu().numpy():
             if not (box[0] <= margin or box[2] >= (w//2)-margin or box[1] <= margin or box[3] >= (h//2)-margin):
                 q_internal_sum += 1
 
+    # Global Pass
     whole_res = models["car_expert"].predict(img_rgb, imgsz=640, conf=0.25, classes=car_classes, verbose=False)[0]
     saved_cars = []
     for box in whole_res.boxes.xyxy.cpu().numpy():
-        if ((box[2]-box[0])*(box[3]-box[1])) < (h * w * 0.98) and not is_duplicate(box, saved_cars, 0.6):
+        if not is_duplicate(box, saved_cars, 0.6):
             saved_cars.append(box)
 
     final_car_count = max(len(saved_cars), q_internal_sum + sum(1 for b in saved_cars if (b[0] < mid_w < b[2]) or (b[1] < mid_h < b[3])))
@@ -132,76 +134,71 @@ def process_image(uploaded_file):
         x1, y1, x2, y2 = map(int, box)
         if is_blue_car_robust(img_rgb[y1:y2, x1:x2]) > 0.30:
             blue_count += 1
-            st.session_state.coords["blue_cars"].append(box.tolist())
+            tmp_cars_blue.append(box.tolist())
             cv2.rectangle(display_img, (x1, y1), (x2, y2), (0, 0, 255), 3)
         else:
-            st.session_state.coords["other_cars"].append(box.tolist())
+            tmp_cars_other.append(box.tolist())
             cv2.rectangle(display_img, (x1, y1), (x2, y2), (255, 0, 0), 3)
 
-    # --- STEP 2: SIGNAL DETECTION (Tiered) ---
-    color_modes_dict = get_color_modes(img_bgr)
-    modes = list(color_modes_dict.values())
-    
+    # --- STEP 2: SIGNAL DETECTION ---
+    modes = list(get_color_modes(img_bgr).values())
     for mode in modes:
         res = model_signal.predict(mode, imgsz=1280, conf=0.05, classes=[9], verbose=False)[0]
         for box in res.boxes.xyxy.cpu().numpy():
-            if not is_duplicate(box, st.session_state.coords["signals"]):
-                st.session_state.coords["signals"].append(box.tolist())
+            if not is_duplicate(box, tmp_signals):
+                tmp_signals.append(box.tolist())
 
-    if not st.session_state.coords["signals"]:
-        h_steps, w_steps = np.linspace(0, h, 11).astype(int), np.linspace(0, w, 11).astype(int)
-        # Horizontal Strips[cite: 1]
-        for i in range(10):
+    # Fallback Strips[cite: 1]
+    if not tmp_signals:
+        h_steps = np.linspace(0, h, 11).astype(int)
+        w_steps = np.linspace(0, w, 11).astype(int)
+        
+        for i in range(10): # Horizontal
             y1, y2 = h_steps[i], h_steps[i+1]
             for mode in modes:
                 strip = cv2.resize(mode[y1:y2, 0:w], (640, 640))
                 res = model_signal.predict(strip, conf=0.05, classes=[9], verbose=False)[0]
                 for box in res.boxes.xyxy.cpu().numpy():
                     g_box = [box[0]*(w/640), box[1]*((y2-y1)/640)+y1, box[2]*(w/640), box[3]*((y2-y1)/640)+y1]
-                    if not is_duplicate(g_box, st.session_state.coords["signals"]): st.session_state.coords["signals"].append(g_box)
+                    if not is_duplicate(g_box, tmp_signals): tmp_signals.append(g_box)
         
-        # Vertical Strips[cite: 1]
-        for j in range(10):
+        for j in range(10): # Vertical - Corrected Scaling[cite: 1]
             x1, x2 = w_steps[j], w_steps[j+1]
+            strip_w = x2 - x1
             for mode in modes:
                 strip = cv2.resize(mode[0:h, x1:x2], (640, 640))
                 res = model_signal.predict(strip, conf=0.05, classes=[9], verbose=False)[0]
                 for box in res.boxes.xyxy.cpu().numpy():
-                    g_box = [box[0]*((x2-x1)/640)+x1, box[1]*(h/640), box[2]*((x2-x1)/640)+x1, box[3]*(h/640)]
-                    if not is_duplicate(g_box, st.session_state.coords["signals"]): st.session_state.coords["signals"].append(g_box)
+                    g_box = [box[0]*(strip_w/640)+x1, box[1]*(h/640), box[2]*(strip_w/640)+x1, box[3]*(h/640)]
+                    if not is_duplicate(g_box, tmp_signals): tmp_signals.append(g_box)
 
     # --- STEP 3: PEOPLE ENSEMBLE ---
     p_count, scene = 0, "Normal Scene"
-    if st.session_state.coords["signals"]:
+    if tmp_signals:
         scene = "Traffic Signal Scene"
         all_p, all_c = [], []
-
-        # Define which models look for people
-        people_models = ["yolo26n", "yolo26s", "yolo26x", "idd_v8", "lvis_v8"]
-       
-        for name in people_models:
-            m = models[name]
+        for name in ["yolo26n", "yolo26s", "yolo26x", "idd_v8", "lvis_v8"]:
             for img_data in modes:
-                # We filter for class 0 (person) directly in the prediction call
-                res = m.predict(img_data, imgsz=1280, conf=0.30, classes=[0], verbose=False)[0]
-                
+                res = models[name].predict(img_data, imgsz=1280, conf=0.30, classes=[0], verbose=False)[0]
                 for box in res.boxes:
-                  
-                        all_p.append(box.xyxy[0].cpu().numpy().tolist())
-                        all_c.append(float(box.conf[0]))
+                    all_p.append(box.xyxy[0].cpu().numpy().tolist())
+                    all_c.append(float(box.conf[0]))
         
         idxs = cv2.dnn.NMSBoxes(all_p, all_c, 0.30, 0.85)
         if len(idxs) > 0:
             for i in idxs.flatten():
                 box = all_p[i]
-                st.session_state.coords["people"].append(box)
+                tmp_people.append(box)
                 cv2.rectangle(display_img, (int(box[0]), int(box[1])), (int(box[2]), int(box[3])), (0, 255, 255), 2)
             p_count = len(idxs)
 
-    for b in st.session_state.coords["signals"]:
+    for b in tmp_signals:
         cv2.rectangle(display_img, (int(b[0]), int(b[1])), (int(b[2]), int(b[3])), (255, 0, 255), 3)
 
-    return display_img, final_car_count, blue_count, scene, p_count
+    # Sync back to session state for persistence if needed
+    st.session_state.coords = {"blue_cars": tmp_cars_blue, "other_cars": tmp_cars_other, "signals": tmp_signals, "people": tmp_people}
+    
+    return display_img, final_car_count, blue_count, scene, p_count   
 
 # --- STREAMLIT GUI ---
 st.title("Traffic Scene Intelligence")
