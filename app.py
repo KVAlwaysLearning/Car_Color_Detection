@@ -5,10 +5,10 @@ from ultralytics import YOLO
 import gdown
 import os
 import streamlit as st
-
-def download_pt_files():
-    # Dictionary of { "filename_on_disk": "google_drive_id" }
-    # Replace 'YOUR_ID' with the actual IDs from your Drive
+# 1. INITIALIZE ALL MODELS (Cached for Streamlit performance)
+@st.cache_resource
+def load_all_assets():
+    # 1. Define the files and IDs
     files = {
         "yolo26n.pt": "1ZGTbc_oHmu42n1EE-cEa0TVBtL7zZ-g2",
         "yolo26s.pt": "1FjrI1avV-uC77iFtk41anBJStyXDLp8p",
@@ -18,18 +18,15 @@ def download_pt_files():
         "yolov8x-oiv7.pt": "1pZNZfN-iRcV6040OIGmQSSrAMT_5KoM6"
     }
 
+    # 2. Download missing files
     for filename, drive_id in files.items():
         if not os.path.exists(filename):
-            with st.spinner(f'Downloading {filename} from Drive...'):
-                url = f'https://drive.google.com/uc?id={drive_id}'
-                gdown.download(url, filename, quiet=False)
+            # Note: st.spinner won't work inside cache_resource easily, 
+            # so we use a simple print or st.info
+            url = f'https://drive.google.com/uc?id={drive_id}'
+            gdown.download(url, filename, quiet=False)
 
-# This must run before you initialize your models
-download_pt_files()
-
-# 1. INITIALIZE ALL MODELS (Cached for Streamlit performance)
-@st.cache_resource
-def load_models():
+    # 3. Load the models into memory
     models = {
         "yolo26n": YOLO('yolo26n.pt'),
         "yolo26s": YOLO('yolo26s.pt'),
@@ -38,11 +35,12 @@ def load_models():
         "lvis_v8": YOLO('yolov8x-worldv2.pt'),
         "car_expert": YOLO('yolov8x-oiv7.pt')
     }
-    models["lvis_v8"].set_classes(["person", "pedestrian", "rider"])
     return models
-
-models = load_models()
-model_signal = YOLO('yolo26x.pt')
+    
+# Initialize everything
+models = load_all_assets()
+# Separate the signal model if needed, or just reference from the dict
+model_signal = models["yolo26x"]
 
 # --- COORDINATE STORAGE ---
 if 'coords' not in st.session_state:
