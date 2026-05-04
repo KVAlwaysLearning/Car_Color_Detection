@@ -117,7 +117,7 @@ def process_image(uploaded_file, debug_mode=False):
             p_count += 1
             cv2.rectangle(display_img, (int(box[0]), int(box[1])), (int(box[2]), int(box[3])), (0, 255, 0), 2)
 
-    if debug_mode:if debug_mode:
+    if debug_mode:
         debug_logs.append(f"Image Resolution: {w}x{h}")
         # New Log: Show every class ID detected, even if it's not a car
         detected_ids = whole_res.boxes.cls.cpu().numpy().tolist()
