@@ -21,7 +21,7 @@ def load_all_assets():
             url = f'https://drive.google.com/uc?id={drive_id}'
             gdown.download(url, filename, quiet=False)
 
-    return {
+    mods = {
         "yolo26n": YOLO('yolo26n.pt'),
         "yolo26s": YOLO('yolo26s.pt'),
         "yolo26x": YOLO('yolo26x.pt'),
@@ -29,10 +29,24 @@ def load_all_assets():
         "lvis_v8": YOLO('yolov8x-worldv2.pt'),
         "car_expert": YOLO('yolov8x-oiv7.pt')
     }
+    # Explicitly set vocabulary for LVIS to ensure indexing matches our map
+    mods["lvis_v8"].set_classes(["person", "pedestrian", "rider", "car", "traffic_light"])
+    return mods
 
 models = load_all_assets()
 
-# --- 2. HELPER FUNCTIONS ---
+# --- 2. CLASS ID AGREEMENT MAP ---
+# Hardcoded IDs to ensure each model looks for the correct entity
+CLASS_MAP = {
+    "yolo26n":    {"person": [0], "car": [2, 7], "signal": [9]},
+    "yolo26s":    {"person": [0], "car": [2, 7], "signal": [9]},
+    "yolo26x":    {"person": [0], "car": [2, 7], "signal": [9]},
+    "idd_v8":     {"person": [0, 1, 2], "car": [4], "signal": [11]},
+    "lvis_v8":    {"person": [0, 1, 2], "car": [3], "signal": [4]},
+    "car_expert": {"person": [68, 566], "car": [90, 223, 312, 522], "signal": [419]}
+}
+
+# --- 3. HELPER FUNCTIONS ---
 def calculate_iou(box1, box2):
     x1_1, y1_1, x2_1, y2_1 = box1
     x1_2, y1_2, x2_2, y2_2 = box2
@@ -52,7 +66,7 @@ def is_blue_car_robust(car_crop_rgb):
     blue_mask = (B > R) & (B > G) & (B > 50) & (B > (R + G) * 0.65)
     return np.count_nonzero(blue_mask) / (car_crop_rgb.shape[0] * car_crop_rgb.shape[1])
 
-# --- 3. CORE PROCESSING ---
+# --- 4. CORE PROCESSING ---
 def process_image(uploaded_file):
     uploaded_file.seek(0)
     file_bytes = np.frombuffer(uploaded_file.read(), np.uint8)
@@ -62,14 +76,10 @@ def process_image(uploaded_file):
     h, w, _ = img_bgr.shape
     img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
     display_img = img_bgr.copy()
-    
-    # Unified Class IDs for Agreement
-    car_ids = [90, 223, 312, 522, 2, 3, 5, 7] # OIV7 + COCO
-    person_id = [0]
-    signal_id = [9]
 
     # --- STEP 1: CAR DETECTION (Quadrant + Global) ---
     mid_h, mid_w, margin = h // 2, w // 2, 10
+    car_ids = CLASS_MAP["car_expert"]["car"] #
     quads = [img_rgb[0:mid_h, 0:mid_w], img_rgb[0:mid_h, mid_w:w],
              img_rgb[mid_h:h, 0:mid_w], img_rgb[mid_h:h, mid_w:w]]
     
@@ -100,6 +110,7 @@ def process_image(uploaded_file):
 
     # --- STEP 2: SIGNAL DETECTION (Multi-Mode) ---
     coords_signals = []
+    signal_id = CLASS_MAP["yolo26x"]["signal"] #
     for mode in [img_rgb, img_bgr]:
         res_sig = models["yolo26x"].predict(mode, imgsz=1280, conf=0.05, classes=signal_id, verbose=False)[0]
         for box in res_sig.boxes.xyxy.cpu().numpy():
@@ -110,8 +121,9 @@ def process_image(uploaded_file):
     scene = "Traffic Signal Scene" if coords_signals else "Normal Scene"
     if coords_signals:
         all_p_boxes, all_p_confs = [], []
+        # Each model uses its specific person ID from CLASS_MAP
         for name in ["yolo26n", "yolo26s", "yolo26x", "idd_v8", "lvis_v8"]:
-            res_p = models[name].predict(img_rgb, imgsz=1280, conf=0.30, classes=person_id, verbose=False)[0]
+            res_p = models[name].predict(img_rgb, imgsz=1280, conf=0.30, classes=CLASS_MAP[name]["person"], verbose=False)[0]
             for box in res_p.boxes:
                 all_p_boxes.append(box.xyxy[0].cpu().numpy().tolist())
                 all_p_confs.append(float(box.conf[0]))
