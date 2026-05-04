@@ -2,6 +2,30 @@ import streamlit as st
 import cv2
 import numpy as np
 from ultralytics import YOLO
+import gdown
+import os
+import streamlit as st
+
+def download_pt_files():
+    # Dictionary of { "filename_on_disk": "google_drive_id" }
+    # Replace 'YOUR_ID' with the actual IDs from your Drive
+    files = {
+        "yolo26n.pt": "1ZGTbc_oHmu42n1EE-cEa0TVBtL7zZ-g2",
+        "yolo26s.pt": "1FjrI1avV-uC77iFtk41anBJStyXDLp8p",
+        "yolo26x.pt": "1Kjlokvxc4IAIXP5c3jh57tVKhQmcZrzl",
+        "idd_yolov8.pt": "1OjHEdbX2bPda9UMtVAVxy7axRFsR_oS6",
+        "yolov8x-worldv2.pt": "1uxcdOFg08qqtY7IM-GdqG_DdL2O4-KUN",
+        "yolov8x-oiv7.pt": "1pZNZfN-iRcV6040OIGmQSSrAMT_5KoM6"
+    }
+
+    for filename, drive_id in files.items():
+        if not os.path.exists(filename):
+            with st.spinner(f'Downloading {filename} from Drive...'):
+                url = f'https://drive.google.com/uc?id={drive_id}'
+                gdown.download(url, filename, quiet=False)
+
+# This must run before you initialize your models
+download_pt_files()
 
 # 1. INITIALIZE ALL MODELS (Cached for Streamlit performance)
 @st.cache_resource
