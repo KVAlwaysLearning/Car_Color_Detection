@@ -203,7 +203,7 @@ if uploaded_file:
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        st.image(cv2.cvtColor(res_img, cv2.COLOR_BGR2RGB), use_container_width=True, caption="Processed Scene")
+        st.image(cv2.cvtColor(res_img, cv2.COLOR_BGR2RGB), use_container_width=True)
     
     with col2:
         st.subheader("Inference Results")
