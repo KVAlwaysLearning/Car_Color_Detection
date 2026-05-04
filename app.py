@@ -27,10 +27,10 @@ def load_all_assets():
             gdown.download(url, filename, quiet=False)
 
     for filename in files.keys():
-    if os.path.exists(filename):
-        st.write(f"✅ {filename} is present ({os.path.getsize(filename) / 1e6:.2f} MB)")
-    else:
-        st.error(f"❌ {filename} is MISSING!")
+        if os.path.exists(filename):
+            st.write(f"✅ {filename} is present ({os.path.getsize(filename) / 1e6:.2f} MB)")
+        else:
+            st.error(f"❌ {filename} is MISSING!")
         
     # 3. Load the models into memory
     models = {
