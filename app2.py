@@ -1,6 +1,3 @@
-Here is the fully revised **app.py** incorporating the quadrant logic, multi-model ensemble, and class-ID agreement from your integrated code.
-
-```python
 import streamlit as st
 import cv2
 import numpy as np
