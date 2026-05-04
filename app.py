@@ -26,6 +26,12 @@ def load_all_assets():
             url = f'https://drive.google.com/uc?id={drive_id}'
             gdown.download(url, filename, quiet=False)
 
+    for filename in files.keys():
+    if os.path.exists(filename):
+        st.write(f"✅ {filename} is present ({os.path.getsize(filename) / 1e6:.2f} MB)")
+    else:
+        st.error(f"❌ {filename} is MISSING!")
+        
     # 3. Load the models into memory
     models = {
         "yolo26n": YOLO('yolo26n.pt'),
@@ -35,6 +41,7 @@ def load_all_assets():
         "lvis_v8": YOLO('yolov8x-worldv2.pt'),
         "car_expert": YOLO('yolov8x-oiv7.pt')
     }
+       
     return models
     
 # Initialize everything
@@ -80,9 +87,17 @@ def get_color_modes(img):
     }
 
 def process_image(uploaded_file):
+    # Reset the pointer to the start of the file just in case
+    uploaded_file.seek(0)
+    
     # Convert Streamlit buffer to OpenCV
     file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
     img_bgr = cv2.imdecode(file_bytes, 1)
+
+    if img_bgr is None:
+        st.error("Could not decode image. Please try a different file.")
+        return None, 0, 0, "Error", 0
+    
     h, w, _ = img_bgr.shape
     img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
     display_img = img_bgr.copy()
