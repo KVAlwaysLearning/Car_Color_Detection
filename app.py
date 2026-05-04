@@ -80,7 +80,7 @@ def process_image(uploaded_file, debug_mode=False):
     car_classes = [90, 223, 312, 522] 
     
     # Global Detection
-    whole_res = models["car_expert"].predict(img_rgb, imgsz=640, conf=0.25, classes=car_classes, verbose=False)[0]
+    whole_res = models["car_expert"].predict(img_rgb, imgsz=640, conf=0.25, verbose=False)[0] # changed car_classes
     
     saved_cars = []
     for box in whole_res.boxes.xyxy.cpu().numpy():
