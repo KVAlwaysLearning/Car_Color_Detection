@@ -45,7 +45,7 @@ def is_duplicate(new_box, saved_boxes, iou_thresh=0.4):
   #if not saved_boxes: return False  
   for saved in saved_boxes:
         if calculate_iou(new_box, saved) > iou_thresh: return True
-    return False
+  return False
 
 def is_blue_car_robust(car_crop_rgb):
     if car_crop_rgb.size == 0: return 0
