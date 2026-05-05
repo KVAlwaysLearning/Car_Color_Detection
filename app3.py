@@ -93,7 +93,7 @@ def process_image(uploaded_file):
                 q_internal_sum += 1
 
     # Global Check
-    whole_res = models["car_expert"].predict(img_rgb, imgsz=640, conf=0.15, classes=car_ids, verbose=False)[0]
+    whole_res = models["car_expert"].predict(img_rgb, imgsz=1280, conf=0.25, classes=car_ids, verbose=False)[0]
     saved_cars = []
     for box in whole_res.boxes.xyxy.cpu().numpy():
         if ((box[2]-box[0])*(box[3]-box[1])) < (h * w * 0.98) and not is_duplicate(box, saved_cars, 0.6):
