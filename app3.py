@@ -63,8 +63,7 @@ def process_image(uploaded_file):
     img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
     display_img = img_bgr.copy()
     
-    # --- UPDATED CLASS AGREEMENT MAP ---[cite: 5]
-    # Hardcoded IDs specific to each model's training set
+    # --- HARDCODED CLASS AGREEMENT MAP ---
     MODEL_ID_MAP = {
         "yolo26n":    {"person": [0], "car": [2, 7], "signal": [9]},
         "yolo26s":    {"person": [0], "car": [2, 7], "signal": [9]},
@@ -76,7 +75,7 @@ def process_image(uploaded_file):
 
     # --- STEP 1: CAR DETECTION (Quadrant + Global) ---
     mid_h, mid_w, margin = h // 2, w // 2, 10
-    car_ids = MODEL_ID_MAP["car_expert"]["car"] # Use expert car IDs[cite: 5]
+    car_ids = MODEL_ID_MAP["car_expert"]["car"]
     quads = [img_rgb[0:mid_h, 0:mid_w], img_rgb[0:mid_h, mid_w:w],
              img_rgb[mid_h:h, 0:mid_w], img_rgb[mid_h:h, mid_w:w]]
     
@@ -105,20 +104,18 @@ def process_image(uploaded_file):
         else:
             cv2.rectangle(display_img, (x1, y1), (x2, y2), (255, 0, 0), 3)
 
-    # --- STEP 2: SIGNAL DETECTION (Multi-Mode) ---
+    # --- STEP 2: SIGNAL DETECTION ---
     coords_signals = []
-    signal_id = MODEL_ID_MAP["yolo26x"]["signal"] # Use signal IDs for yolo26x[cite: 5]
-    for mode in [img_rgb, img_bgr]:
-        res_sig = models["yolo26x"].predict(mode, imgsz=1280, conf=0.05, classes=signal_id, verbose=False)[0]
-        for box in res_sig.boxes.xyxy.cpu().numpy():
-            if not is_duplicate(box, coords_signals): coords_signals.append(box.tolist())
+    signal_id = MODEL_ID_MAP["yolo26x"]["signal"]
+    res_sig = models["yolo26x"].predict(img_rgb, imgsz=1280, conf=0.05, classes=signal_id, verbose=False)[0]
+    for box in res_sig.boxes.xyxy.cpu().numpy():
+        if not is_duplicate(box, coords_signals): coords_signals.append(box.tolist())
 
-    # --- STEP 3: PEOPLE ENSEMBLE (Agreement via NMS) ---
+    # --- STEP 3: PEOPLE ENSEMBLE (Using Agreement Map) ---
     p_count = 0
     scene = "Traffic Signal Scene" if coords_signals else "Normal Scene"
     if coords_signals:
         all_p_boxes, all_p_confs = [], []
-        # Query each model using its unique hardcoded Person ID[cite: 5]
         for name in ["yolo26n", "yolo26s", "yolo26x", "idd_v8", "lvis_v8"]:
             person_ids = MODEL_ID_MAP[name]["person"]
             res_p = models[name].predict(img_rgb, imgsz=1280, conf=0.30, classes=person_ids, verbose=False)[0]
