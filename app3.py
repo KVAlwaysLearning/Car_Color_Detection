@@ -62,31 +62,38 @@ def process_image(uploaded_file):
     h, w, _ = img_bgr.shape
     img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
     display_img = img_bgr.copy()
-    
-    # --- HARDCODED CLASS AGREEMENT MAP ---
-    MODEL_ID_MAP = {
-        "yolo26n":    {"person": [0], "car": [2, 7], "signal": [9]},
-        "yolo26s":    {"person": [0], "car": [2, 7], "signal": [9]},
-        "yolo26x":    {"person": [0], "car": [2, 7], "signal": [9]},
-        "idd_v8":     {"person": [0, 1, 2], "car": [4], "signal": [11]},
-        "lvis_v8":    {"person": [0, 1, 2], "car": [3], "signal": [10]},
-        "car_expert": {"person": [68, 566], "car": [90, 223, 312, 522], "signal": [419]}
+
+    # --- DYNAMIC ID DISCOVERY ---
+    # This part replaces the hardcoded dictionary to ensure we never miss a class
+    def get_ids(model, keywords):
+        return [id for id, name in model.names.items() if any(k in name.lower() for k in keywords)]
+
+    # Map IDs dynamically for each model
+    ids = {
+        name: {
+            "person": get_ids(mod, ["person", "pedestrian", "rider"]),
+            "car": get_ids(mod, ["car", "bus", "truck", "van", "vehicle"]),
+            "signal": get_ids(mod, ["traffic light", "traffic signal", "signal"])
+        } for name, mod in models.items()
     }
 
-    # --- STEP 1: CAR DETECTION (Quadrant + Global) ---
+    # --- STEP 1: CAR DETECTION ---
     mid_h, mid_w, margin = h // 2, w // 2, 10
-    car_ids = MODEL_ID_MAP["car_expert"]["car"]
+    car_ids = ids["car_expert"]["car"]
+    
+    # Quadrant Check
     quads = [img_rgb[0:mid_h, 0:mid_w], img_rgb[0:mid_h, mid_w:w],
              img_rgb[mid_h:h, 0:mid_w], img_rgb[mid_h:h, mid_w:w]]
     
     q_internal_sum = 0
     for q_img in quads:
-        res = models["car_expert"].predict(q_img, imgsz=640, conf=0.25, classes=car_ids, verbose=False)[0]
+        res = models["car_expert"].predict(q_img, imgsz=640, conf=0.15, classes=car_ids, verbose=False)[0]
         for box in res.boxes.xyxy.cpu().numpy():
             if not (box[0] <= margin or box[2] >= (w//2)-margin or box[1] <= margin or box[3] >= (h//2)-margin):
                 q_internal_sum += 1
 
-    whole_res = models["car_expert"].predict(img_rgb, imgsz=640, conf=0.20, classes=car_ids, verbose=False)[0]
+    # Global Check
+    whole_res = models["car_expert"].predict(img_rgb, imgsz=640, conf=0.15, classes=car_ids, verbose=False)[0]
     saved_cars = []
     for box in whole_res.boxes.xyxy.cpu().numpy():
         if ((box[2]-box[0])*(box[3]-box[1])) < (h * w * 0.98) and not is_duplicate(box, saved_cars, 0.6):
@@ -95,10 +102,11 @@ def process_image(uploaded_file):
     boundary_count = sum(1 for b in saved_cars if (b[0] < mid_w < b[2]) or (b[1] < mid_h < b[3]))
     final_car_count = max(len(saved_cars), q_internal_sum + boundary_count)
 
+    # Blue Car Logic
     blue_count = 0
     for box in saved_cars:
         x1, y1, x2, y2 = map(int, box)
-        if is_blue_car_robust(img_rgb[y1:y2, x1:x2]) > 0.30:
+        if is_blue_car_robust(img_rgb[y1:y2, x1:x2]) > 0.25: # Lowered threshold slightly
             blue_count += 1
             cv2.rectangle(display_img, (x1, y1), (x2, y2), (0, 0, 255), 3)
         else:
@@ -106,24 +114,28 @@ def process_image(uploaded_file):
 
     # --- STEP 2: SIGNAL DETECTION ---
     coords_signals = []
-    signal_id = MODEL_ID_MAP["yolo26x"]["signal"]
-    res_sig = models["yolo26x"].predict(img_rgb, imgsz=1280, conf=0.05, classes=signal_id, verbose=False)[0]
+    sig_ids = ids["yolo26x"]["signal"]
+    res_sig = models["yolo26x"].predict(img_rgb, imgsz=1280, conf=0.01, classes=sig_ids, verbose=False)[0]
     for box in res_sig.boxes.xyxy.cpu().numpy():
-        if not is_duplicate(box, coords_signals): coords_signals.append(box.tolist())
+        coords_signals.append(box.tolist())
 
-    # --- STEP 3: PEOPLE ENSEMBLE (Using Agreement Map) ---
+    # --- STEP 3: PEOPLE ENSEMBLE ---
     p_count = 0
     scene = "Traffic Signal Scene" if coords_signals else "Normal Scene"
-    if coords_signals:
-        all_p_boxes, all_p_confs = [], []
-        for name in ["yolo26n", "yolo26s", "yolo26x", "idd_v8", "lvis_v8"]:
-            person_ids = MODEL_ID_MAP[name]["person"]
-            res_p = models[name].predict(img_rgb, imgsz=1280, conf=0.30, classes=person_ids, verbose=False)[0]
-            for box in res_p.boxes:
-                all_p_boxes.append(box.xyxy[0].cpu().numpy().tolist())
-                all_p_confs.append(float(box.conf[0]))
+    
+    # We run the ensemble regardless of the scene for testing, but can keep your logic
+    all_p_boxes, all_p_confs = [], []
+    for name in ["yolo26n", "yolo26s", "yolo26x", "idd_v8", "lvis_v8"]:
+        p_ids = ids[name]["person"]
+        if not p_ids: continue
         
-        p_indices = cv2.dnn.NMSBoxes(all_p_boxes, all_p_confs, 0.30, 0.85)
+        res_p = models[name].predict(img_rgb, imgsz=1280, conf=0.20, classes=p_ids, verbose=False)[0]
+        for box in res_p.boxes:
+            all_p_boxes.append(box.xyxy[0].cpu().numpy().tolist())
+            all_p_confs.append(float(box.conf[0]))
+    
+    if all_p_boxes:
+        p_indices = cv2.dnn.NMSBoxes(all_p_boxes, all_p_confs, 0.20, 0.70)
         if len(p_indices) > 0:
             p_count = len(p_indices.flatten())
             for i in p_indices.flatten():
@@ -133,7 +145,7 @@ def process_image(uploaded_file):
     for b in coords_signals:
         cv2.rectangle(display_img, (int(b[0]), int(b[1])), (int(b[2]), int(b[3])), (255, 0, 255), 3)
 
-    logs = [f"Res: {w}x{h}", f"Global Detections: {len(whole_res.boxes)}", f"Signals: {len(coords_signals)}"]
+    logs = [f"Res: {w}x{h}", f"Car IDs used: {car_ids}", f"Signal IDs used: {sig_ids}"]
     return display_img, final_car_count, blue_count, scene, p_count, logs
 
 # --- 4. STREAMLIT UI ---
