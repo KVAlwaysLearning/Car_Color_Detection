@@ -174,11 +174,11 @@ def process_image(uploaded_file):
       for name in ["yolo26n", "yolo26s", "yolo26x", "idd_v8", "lvis_v8"]:
           specific_person_ids = model_ids[name]["person"]
 
-            for m_name in ["RGB", "BGR", "Grey"]:
-                res_p = models[name].predict(modes_dict[m_name], imgsz=1280, conf=0.30, classes=specific_person_ids, verbose=False)[0]
-                for box in res_p.boxes:
-                    all_p_boxes.append(box.xyxy[0].cpu().numpy().tolist())
-                    all_p_confs.append(float(box.conf[0]))
+          for m_name in ["RGB", "BGR", "Grey"]:
+              res_p = models[name].predict(modes_dict[m_name], imgsz=1280, conf=0.30, classes=specific_person_ids, verbose=False)[0]
+              for box in res_p.boxes:
+                all_p_boxes.append(box.xyxy[0].cpu().numpy().tolist())
+                all_p_confs.append(float(box.conf[0]))
         
         p_indices = cv2.dnn.NMSBoxes(all_p_boxes, all_p_confs, 0.30, 0.85)
         if len(p_indices) > 0:
