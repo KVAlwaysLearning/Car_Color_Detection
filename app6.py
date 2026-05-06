@@ -191,15 +191,24 @@ st.title("🚦 Traffic Scene Intelligence")
 
 uploaded_file = st.file_uploader("Upload Image", type=['jpg', 'jpeg', 'png'])
 
+
 if uploaded_file:
     res_img, t_cars, b_cars, scene, p_counts,u_sig = process_image(uploaded_file)
     
     col1, col2 = st.columns([3, 1])
     with col1:
         st.image(cv2.cvtColor(res_img, cv2.COLOR_BGR2RGB), width=768)
+        
     with col2:
         st.metric("Total Cars", t_cars)
         st.metric("Blue Cars", b_cars)
-        st.metric("Pedestrians", p_counts)
+        
+        # --- CONDITIONAL PEOPLE DISPLAY ---
+        if scene == "Normal Scene":
+            st.warning("⚠️ People Detection Not Applicable for Non-Traffic Signal Scene")
+        else:
+            st.metric("Pedestrians", p_counts)
+            
         st.info(f"Scene Type: {scene}")
-        st.info(f"{u_sig}")
+        # Optional: Hide coordinate list if it clutters the UI
+        # st.info(f"{u_sig}")
