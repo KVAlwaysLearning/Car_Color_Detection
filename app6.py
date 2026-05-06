@@ -33,7 +33,7 @@ def load_all_assets():
 models = load_all_assets()
 
 # --- 2. HELPER FUNCTIONS ---
-def is_duplicate(new_box, saved_boxes, iou_thresh=0.3):
+def is_duplicate(new_box, saved_boxes, iou_thresh=0.2):
     if not saved_boxes: return False
     nx1, ny1, nx2, ny2 = new_box
     for sx1, sy1, sx2, sy2 in saved_boxes:
