@@ -129,7 +129,7 @@ def process_image(uploaded_file):
         res_sig = models["yolo26x"].predict(
         mode, 
         imgsz=1280, 
-        conf=0.05, 
+        conf=0.03, 
         classes=[9],
         device='cpu',
         verbose=False
@@ -141,16 +141,21 @@ def process_image(uploaded_file):
 
     # Tier 2: Deep Strip Scan
     if not unique_signals:
-        h_steps = np.linspace(0, h, 11).astype(int)
-        w_steps = np.linspace(0, w, 11).astype(int)
-        for i in range(10):
-            for m_name in ["RGB", "BGR", "Grey"]:
-                strip_h = modes_dict[m_name][h_steps[i]:h_steps[i+1], 0:w]
-                res_h = models["yolo26x"].predict(cv2.resize(strip_h, (640, 640)), conf=0.05, classes=[9], verbose=False)[0]
-                for b in res_h.boxes.xyxy.cpu().numpy():
-                    g_box = [b[0]*(w/640), b[1]*((h/10)/640)+h_steps[i], b[2]*(w/640), b[3]*((h/10)/640)+h_steps[i]]
-                    if not is_duplicate(g_box, unique_signals): unique_signals.append(g_box)
-
+    h_steps = np.linspace(0, h, 11).astype(int)
+    for i in range(10):
+        y1, y2 = h_steps[i], h_steps[i+1]
+        for m_name in ["RGB", "BGR", "Grey"]:
+            strip = modes_dict[m_name][y1:y2, 0:w]
+            sh, sw = strip.shape[:2] # Get actual strip dimensions
+            res_h = models["yolo26x"].predict(cv2.resize(strip, (640, 640)), conf=0.05, classes=[9], verbose=False)[0]
+            for b in res_h.boxes.xyxy.cpu().numpy():
+                # Correct scaling based on the actual strip size vs the 640 target
+                rx1, ry1 = b[0] * (sw/640), b[1] * (sh/640)
+                rx2, ry2 = b[2] * (sw/640), b[3] * (sh/640)
+                g_box = [rx1, ry1 + y1, rx2, ry2 + y1]
+                if not is_duplicate(g_box, unique_signals): 
+                    unique_signals.append(g_box)
+                    
     # --- STEP 3: PEOPLE ENSEMBLE ---
     p_count = 0
     scene = "Traffic Signal Scene" if unique_signals else "Normal Scene"
