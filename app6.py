@@ -171,7 +171,7 @@ uploaded_file = st.file_uploader("Upload Image", type=['jpg', 'jpeg', 'png'])
 if uploaded_file:
     res_img, t_cars, b_cars, scene, p_counts = process_image(uploaded_file)
     
-    col1, col2 = st.columns([3, 1)
+    col1, col2 = st.columns([3, 1])
     with col1:
         st.image(cv2.cvtColor(res_img, cv2.COLOR_BGR2RGB), width=1024)
     with col2:
