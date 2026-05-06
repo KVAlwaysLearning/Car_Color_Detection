@@ -42,9 +42,8 @@ def is_duplicate(new_box, saved_boxes, iou_thresh=0.4):
         iw, ih = max(0, ix2 - ix1), max(0, iy2 - iy1)
         inters = iw * ih
         uni = (nx2-nx1)*(ny2-ny1) + (sx2-sx1)*(sy2-sy1) - inters
-        if uni > 0 and (inters / uni) > iou_thresh: 
-            return True
-    return False
+        return inters / uni if uni > 0 else 0
+    
 
 def is_duplicate(new_box, saved_boxes, iou_thresh=0.4):
     for saved in saved_boxes:
