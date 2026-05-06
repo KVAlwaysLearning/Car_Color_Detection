@@ -175,7 +175,7 @@ def process_image(uploaded_file):
         cv2.rectangle(display_img, (int(b[0]), int(b[1])), (int(b[2]), int(b[3])), (255, 0, 255), 3)
 
     logs = [f"Res: {w}x{h}", f"Car IDs: {car_ids}", f"Signal IDs: {sig_ids}", f"Signal Mode: {'Tier 2' if not unique_signals else 'Tier 1'}"]
-    return display_img, final_car_count, blue_count, scene, p_count, logs
+    return display_img, final_car_count, blue_count, scene, p_count
 
 # --- 4. STREAMLIT UI ---
 st.set_page_config(page_title="Integrated Traffic Intel", layout="wide")
