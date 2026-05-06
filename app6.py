@@ -124,7 +124,7 @@ def process_image(uploaded_file):
     modes_to_test = [color_modes_dict["RGB"], color_modes_dict["BGR"], color_modes_dict["Grey"]]
     
     # Tier 1: Multi-Mode Pass
-    for mode in modes_to_test
+    for mode in modes_to_test:
         res_sig = models["yolo26x"].predict(
         mode, 
         imgsz=1280, 
