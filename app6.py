@@ -125,7 +125,7 @@ def process_image(uploaded_file):
         imgsz=1280, 
         conf=0.05, 
         classes=[9],
-        device='cpu'
+        device='cpu',
         verbose=False
     )[0]
         for box in res_sig.boxes.xyxy.cpu().numpy():
