@@ -159,7 +159,7 @@ def process_image(uploaded_file):
         cv2.rectangle(display_img, (int(b[0]), int(b[1])), (int(b[2]), int(b[3])), (255, 0, 255), 3)
 
     # RESIZE OUTPUT TO 256X256
-    final_render = cv2.resize(display_img, (256, 256))
+    final_render = cv2.resize(display_img, (512, 512))
     return final_render, final_car_count, blue_count, scene, p_count
 
 # --- 4. STREAMLIT UI ---
@@ -173,7 +173,7 @@ if uploaded_file:
     
     col1, col2 = st.columns([1, 2])
     with col1:
-        st.image(cv2.cvtColor(res_img, cv2.COLOR_BGR2RGB), width=256)
+        st.image(cv2.cvtColor(res_img, cv2.COLOR_BGR2RGB), width=512)
     with col2:
         st.metric("Total Cars", t_cars)
         st.metric("Blue Cars", b_cars)
