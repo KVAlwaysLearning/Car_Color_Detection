@@ -179,18 +179,18 @@ def process_image(uploaded_file):
 
 # --- 4. STREAMLIT UI ---
 st.set_page_config(page_title="Integrated Traffic Intel", layout="wide")
-st.title("🚦 Integrated Traffic Intelligence")
+st.title("🚦 Traffic Scene Intelligence")
 
-uploaded_file = st.file_uploader("Upload Scene", type=['jpg', 'jpeg', 'png'])
+uploaded_file = st.file_uploader("Upload Image", type=['jpg', 'jpeg', 'png'])
 
 if uploaded_file:
-    res_img, t_cars, b_cars, scene, p_counts, logs = process_image(uploaded_file)
-    col1, col2 = st.columns([2, 1])
+    res_img, t_cars, b_cars, scene, p_counts = process_image(uploaded_file)
+    
+    col1, col2 = st.columns([1, 2])
     with col1:
-        st.image(cv2.cvtColor(res_img, cv2.COLOR_BGR2RGB), use_container_width=True)
+        st.image(cv2.cvtColor(res_img, cv2.COLOR_BGR2RGB), width=256)
     with col2:
-        st.metric("Total Cars", t_cars) # Changed to Total Cars
-        st.metric("Blue Cars", b_cars)   # Changed to Blue Cars
+        st.metric("Total Cars", t_cars)
+        st.metric("Blue Cars", b_cars)
         st.metric("Pedestrians", p_counts)
-        st.info(f"Scene: {scene}")
-        for log in logs: st.write(f"• {log}")
+        st.info(f"Scene Type: {scene}")
