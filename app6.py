@@ -171,7 +171,7 @@ def process_image(uploaded_file):
 
     # RESIZE OUTPUT TO 256X256
     final_render = cv2.resize(display_img, (768, 768))
-    return final_render, final_car_count, blue_count, scene, p_count
+    return final_render, final_car_count, blue_count, scene, p_count, unique_signals
 
 # --- 4. STREAMLIT UI ---
 st.set_page_config(page_title="Integrated Traffic Intel", layout="wide")
@@ -180,7 +180,7 @@ st.title("🚦 Traffic Scene Intelligence")
 uploaded_file = st.file_uploader("Upload Image", type=['jpg', 'jpeg', 'png'])
 
 if uploaded_file:
-    res_img, t_cars, b_cars, scene, p_counts = process_image(uploaded_file)
+    res_img, t_cars, b_cars, scene, p_counts,u_sig = process_image(uploaded_file)
     
     col1, col2 = st.columns([3, 1])
     with col1:
@@ -190,3 +190,4 @@ if uploaded_file:
         st.metric("Blue Cars", b_cars)
         st.metric("Pedestrians", p_counts)
         st.info(f"Scene Type: {scene}")
+        st.info(f"{u_sig}")
