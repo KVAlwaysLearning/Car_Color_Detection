@@ -114,9 +114,9 @@ def process_image(uploaded_file):
         x1, y1, x2, y2 = map(int, box)
         if is_blue_car_robust(img_rgb[y1:y2, x1:x2]) > 0.30:
             blue_count += 1
-            cv2.rectangle(display_img, (x1, y1), (x2, y2), (0, 0, 255), 3)
+            cv2.rectangle(display_img, (x1, y1), (x2, y2), (0, 0, 255), 1)
         else:
-            cv2.rectangle(display_img, (x1, y1), (x2, y2), (255, 0, 0), 3)
+            cv2.rectangle(display_img, (x1, y1), (x2, y2), (255, 0, 0), 1)
 
     # --- STEP 2: SIGNAL DETECTION (TIERED SCAN) ---
     unique_signals = []
@@ -176,10 +176,10 @@ def process_image(uploaded_file):
             p_count = len(p_indices.flatten())
             for i in p_indices.flatten():
                 b = all_p_boxes[i]
-                cv2.rectangle(display_img, (int(b[0]), int(b[1])), (int(b[2]), int(b[3])), (0, 255, 255), 2)
+                cv2.rectangle(display_img, (int(b[0]), int(b[1])), (int(b[2]), int(b[3])), (0, 255, 255), 1)
 
     #for b in unique_signals:
-    #    cv2.rectangle(display_img, (int(b[0]), int(b[1])), (int(b[2]), int(b[3])), (255, 0, 255), 3)
+    #    cv2.rectangle(display_img, (int(b[0]), int(b[1])), (int(b[2]), int(b[3])), (255, 0, 255), 1)
 
     # RESIZE OUTPUT TO 256X256
     final_render = cv2.resize(display_img, (768, 768))
