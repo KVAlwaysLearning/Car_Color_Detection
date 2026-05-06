@@ -96,7 +96,7 @@ def process_image(uploaded_file):
 
     # --- STEP 1: CAR DETECTION ---
     mid_h, mid_w, margin = h // 2, w // 2, 10
-    car_ids = target_keywords["car"]
+    car_ids = target_keywords['car_expert']["car"]
     
     q_internal_sum = 0
     quads = [img_rgb[0:mid_h, 0:mid_w], img_rgb[0:mid_h, mid_w:w],
