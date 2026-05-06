@@ -33,16 +33,22 @@ def load_all_assets():
 models = load_all_assets()
 
 # --- 2. HELPER FUNCTIONS ---
-def is_duplicate(new_box, saved_boxes, iou_thresh=0.2):
+def is_duplicate(new_box, saved_boxes, iou_thresh=0.4):
     if not saved_boxes: return False
     nx1, ny1, nx2, ny2 = new_box
+    area1 = (nx2 - nx1) * (ny2 - ny1)
     for sx1, sy1, sx2, sy2 in saved_boxes:
+        area2 = (sx2 - sx1) * (sy2 - sy1)
         ix1, iy1 = max(nx1, sx1), max(ny1, sy1)
         ix2, iy2 = min(nx2, sx2), min(ny2, sy2)
         iw, ih = max(0, ix2 - ix1), max(0, iy2 - iy1)
         inters = iw * ih
-        uni = (nx2-nx1)*(ny2-ny1) + (sx2-sx1)*(sy2-sy1) - inters
+        uni = area1 + area2 - inters
+        
+        # Check standard IoU
         if uni > 0 and (inters / uni) > iou_thresh: return True
+        # NEW: Check if one box is almost entirely inside the other (Nested check)
+        if inters / min(area1, area2) > 0.85: return True 
     return False
 
 
