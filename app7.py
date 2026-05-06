@@ -180,7 +180,7 @@ def process_image(uploaded_file):
                 all_p_boxes.append(box.xyxy[0].cpu().numpy().tolist())
                 all_p_confs.append(float(box.conf[0]))
         
-    p_indices = cv2.dnn.NMSBoxes(all_p_boxes, all_p_confs, 0.30, 0.85)
+        p_indices = cv2.dnn.NMSBoxes(all_p_boxes, all_p_confs, 0.30, 0.85)
     if len(p_indices) > 0:
         p_count = len(p_indices.flatten())
         for i in p_indices.flatten():
