@@ -124,7 +124,8 @@ def process_image(uploaded_file):
         mode, 
         imgsz=1280, 
         conf=0.05, 
-        classes=[9], 
+        classes=[9],
+        device='cpu'
         verbose=False
     )[0]
         for box in res_sig.boxes.xyxy.cpu().numpy():
@@ -139,7 +140,7 @@ def process_image(uploaded_file):
         for i in range(10):
             for m_name in ["RGB", "BGR", "Grey"]:
                 strip_h = modes_dict[m_name][h_steps[i]:h_steps[i+1], 0:w]
-                res_h = models["yolo26x"].predict(cv2.resize(strip_h, (640, 640)), conf=0.05, classes=sig_ids, verbose=False)[0]
+                res_h = models["yolo26x"].predict(cv2.resize(strip_h, (640, 640)), conf=0.05, classes=[9], verbose=False)[0]
                 for b in res_h.boxes.xyxy.cpu().numpy():
                     g_box = [b[0]*(w/640), b[1]*((h/10)/640)+h_steps[i], b[2]*(w/640), b[3]*((h/10)/640)+h_steps[i]]
                     if not is_duplicate(g_box, unique_signals): unique_signals.append(g_box)
