@@ -33,13 +33,18 @@ def load_all_assets():
 models = load_all_assets()
 
 # --- 2. HELPER FUNCTIONS ---
-def calculate_iou(box1, box2):
-    x1_1, y1_1, x2_1, y2_1 = box1
-    x1_2, y1_2, x2_2, y2_2 = box2
-    xi1, yi1, xi2, yi2 = max(x1_1, x1_2), max(y1_1, y1_2), min(x2_1, x2_2), min(y2_1, y2_2)
-    inter_area = max(0, xi2 - xi1) * max(0, yi2 - yi1)
-    union_area = (x2_1 - x1_1) * (y2_1 - y1_1) + (x2_2 - x1_2) * (y2_2 - y1_2) - inter_area
-    return inter_area / union_area if union_area > 0 else 0
+def is_duplicate(new_box, saved_boxes, iou_thresh=0.4):
+    if not saved_boxes: return False
+    nx1, ny1, nx2, ny2 = new_box
+    for sx1, sy1, sx2, sy2 in saved_boxes:
+        ix1, iy1 = max(nx1, sx1), max(ny1, sy1)
+        ix2, iy2 = min(nx2, sx2), min(ny2, sy2)
+        iw, ih = max(0, ix2 - ix1), max(0, iy2 - iy1)
+        inters = iw * ih
+        uni = (nx2-nx1)*(ny2-ny1) + (sx2-sx1)*(sy2-sy1) - inters
+        if uni > 0 and (inters / uni) > iou_thresh: 
+            return True
+    return False
 
 def is_duplicate(new_box, saved_boxes, iou_thresh=0.4):
     for saved in saved_boxes:
@@ -114,13 +119,23 @@ def process_image(uploaded_file):
 
     # --- STEP 2: SIGNAL DETECTION (TIERED SCAN) ---
     unique_signals = []
-    sig_ids = ids["yolo26x"]["signal"]
+    #sig_ids = ids["yolo26x"]["signal"]
+    color_modes_dict = get_color_modes(img_bgr) # img_bgr is what cv2.imdecode produced
+    modes_to_test = [color_modes_dict["RGB"], color_modes_dict["BGR"], color_modes_dict["Grey"]]
     
     # Tier 1: Multi-Mode Pass
-    for m_name in ["RGB", "BGR", "Grey"]:
-        res_sig = models["yolo26x"].predict(modes_dict[m_name], imgsz=1280, conf=0.05, classes=sig_ids, verbose=False)[0]
+    for mode in modes_to_test
+        res_sig = models["yolo26x"].predict(
+        mode, 
+        imgsz=1280, 
+        conf=0.05, 
+        classes=[9], 
+        verbose=False
+    )[0]
         for box in res_sig.boxes.xyxy.cpu().numpy():
-            if not is_duplicate(box, unique_signals): unique_signals.append(box.tolist())
+        # Use your original is_duplicate check with iou_thresh=0.4
+            if not is_duplicate(box, unique_signals, iou_thresh=0.4):
+                unique_signals.append(box.tolist())
 
     # Tier 2: Deep Strip Scan
     if not unique_signals:
@@ -159,7 +174,7 @@ def process_image(uploaded_file):
         cv2.rectangle(display_img, (int(b[0]), int(b[1])), (int(b[2]), int(b[3])), (255, 0, 255), 3)
 
     # RESIZE OUTPUT TO 256X256
-    final_render = cv2.resize(display_img, (1024, 1024))
+    final_render = cv2.resize(display_img, (768, 768))
     return final_render, final_car_count, blue_count, scene, p_count
 
 # --- 4. STREAMLIT UI ---
@@ -173,7 +188,7 @@ if uploaded_file:
     
     col1, col2 = st.columns([3, 1])
     with col1:
-        st.image(cv2.cvtColor(res_img, cv2.COLOR_BGR2RGB), width=1024)
+        st.image(cv2.cvtColor(res_img, cv2.COLOR_BGR2RGB), width=768)
     with col2:
         st.metric("Total Cars", t_cars)
         st.metric("Blue Cars", b_cars)
