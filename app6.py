@@ -123,7 +123,7 @@ def process_image(uploaded_file):
         res_sig = models["yolo26x"].predict(
         mode, 
         imgsz=1280, 
-        conf=0.01, 
+        conf=0.05, 
         classes=[9],
         device='cpu',
         verbose=False
