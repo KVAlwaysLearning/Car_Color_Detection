@@ -129,8 +129,8 @@ def process_image(uploaded_file):
         verbose=False
     )[0]
         for box in res_sig.boxes.xyxy.cpu().numpy():
-        # Use your original is_duplicate check with iou_thresh=0.4
-            if not is_duplicate(box, unique_signals, iou_thresh=0.4):
+        # Use your original is_duplicate check with iou_thresh=0.3
+            if not is_duplicate(box, unique_signals, iou_thresh=0.3):
                 unique_signals.append(box.tolist())
 
     # Tier 2: Deep Strip Scan
