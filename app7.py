@@ -173,25 +173,24 @@ def process_image(uploaded_file):
       # Loop through the ensemble and pull the specific 'person' IDs for EACH model
       for name in ["yolo26n", "yolo26s", "yolo26x", "idd_v8", "lvis_v8"]:
           specific_person_ids = model_ids[name]["person"]
-
+        
           for m_name in ["RGB", "BGR", "Grey"]:
               res_p = models[name].predict(modes_dict[m_name], imgsz=1280, conf=0.30, classes=specific_person_ids, verbose=False)[0]
               for box in res_p.boxes:
                 all_p_boxes.append(box.xyxy[0].cpu().numpy().tolist())
                 all_p_confs.append(float(box.conf[0]))
-    
-    if all_p_boxes:   
-        p_indices = cv2.dnn.NMSBoxes(all_p_boxes, all_p_confs, 0.30, 0.85)
-    
-    if len(p_indices) > 0:
+            
+      p_indices = cv2.dnn.NMSBoxes(all_p_boxes, all_p_confs, 0.30, 0.85)
+            
+      if len(p_indices) > 0:
         p_count = len(p_indices.flatten())
         for i in p_indices.flatten():
             b = all_p_boxes[i]
             cv2.rectangle(display_img, (int(b[0]), int(b[1])), (int(b[2]), int(b[3])), (0, 255, 255), 1)
-
+    
     #for b in unique_signals:
     #    cv2.rectangle(display_img, (int(b[0]), int(b[1])), (int(b[2]), int(b[3])), (255, 0, 255), 1)
-
+    
     # RESIZE OUTPUT TO 256X256
     final_render = cv2.resize(display_img, (768, 768))
     return final_render, final_car_count, blue_count, scene, p_count, unique_signals
