@@ -178,8 +178,8 @@ def process_image(uploaded_file):
                 b = all_p_boxes[i]
                 cv2.rectangle(display_img, (int(b[0]), int(b[1])), (int(b[2]), int(b[3])), (0, 255, 255), 2)
 
-    for b in unique_signals:
-        cv2.rectangle(display_img, (int(b[0]), int(b[1])), (int(b[2]), int(b[3])), (255, 0, 255), 3)
+    #for b in unique_signals:
+    #    cv2.rectangle(display_img, (int(b[0]), int(b[1])), (int(b[2]), int(b[3])), (255, 0, 255), 3)
 
     # RESIZE OUTPUT TO 256X256
     final_render = cv2.resize(display_img, (768, 768))
