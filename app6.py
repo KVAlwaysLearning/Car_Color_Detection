@@ -141,7 +141,8 @@ def process_image(uploaded_file):
 
     # Tier 2: Deep Strip Scan
     if not unique_signals:
-    h_steps = np.linspace(0, h, 11).astype(int)
+        h_steps = np.linspace(0, h, 11).astype(int)
+    
     for i in range(10):
         y1, y2 = h_steps[i], h_steps[i+1]
         for m_name in ["RGB", "BGR", "Grey"]:
