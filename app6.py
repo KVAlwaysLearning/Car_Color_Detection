@@ -123,14 +123,14 @@ def process_image(uploaded_file):
         res_sig = models["yolo26x"].predict(
         mode, 
         imgsz=1280, 
-        conf=0.05, 
+        conf=0.01, 
         classes=[9],
         device='cpu',
         verbose=False
     )[0]
         for box in res_sig.boxes.xyxy.cpu().numpy():
         # Use your original is_duplicate check with iou_thresh=0.3
-            if not is_duplicate(box, unique_signals, iou_thresh=0.3):
+            if not is_duplicate(box, unique_signals, iou_thresh=0.2):
                 unique_signals.append(box.tolist())
 
     # Tier 2: Deep Strip Scan
