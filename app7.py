@@ -120,7 +120,7 @@ def process_image(uploaded_file):
     blue_count = 0
     for box in saved_cars:
         x1, y1, x2, y2 = map(int, box)
-        if is_blue_car_robust(img_rgb[y1:y2, x1:x2]) > 0.30:
+        if is_blue_car_robust(img_rgb[y1:y2, x1:x2]) > 0.15:
             blue_count += 1
             cv2.rectangle(display_img, (x1, y1), (x2, y2), (0, 0, 255), 1)
         else:
